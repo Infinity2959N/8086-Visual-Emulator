@@ -23,8 +23,7 @@ jobs:
       - name: Run ESLint
         run: |
           if npm run | grep -q "lint"; then
-            npm run lint -- --fix-dry-run
+            npm run lint -- --fix-dry-run --max-warnings 0
           else
-            npx eslint@8.57.0 "src/**/*.js" --fix-dry-run
+            npx eslint@8.57.0 "src/**/*.js" --fix-dry-run --max-warnings 0
           fi
-        continue-on-error: true # Don't block them yet, just warn
