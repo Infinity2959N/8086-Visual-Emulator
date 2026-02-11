@@ -10,5 +10,21 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      - run: npx eslint src/**/*.js --fix-dry-run
+      - name: Install Node.js dependencies
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          elif [ -f package.json ]; then
+            npm install
+          else
+            npm init -y
+            npm install --save-dev eslint@8.57.0
+          fi
+      - name: Run ESLint
+        run: |
+          if npm run | grep -q "lint"; then
+            npm run lint -- --fix-dry-run
+          else
+            npx eslint@8.57.0 "src/**/*.js" --fix-dry-run
+          fi
         continue-on-error: true # Don't block them yet, just warn
