@@ -1,10 +1,18 @@
 /**
  * Role 1: Engine Architect - ALU Module
  * Handles arithmetic, logical operations, and Flag updates.
- * TODO [R1-D]: Implement Signed Math (IMUL/IDIV)
+ * 
+ * Implemented Instructions:
+ * - Arithmetic: ADD, SUB, INC, DEC, CMP, MUL, DIV, IMUL, IDIV, NEG
+ * - Logical: AND, OR, XOR, NOT, TEST
+ * - Shifts: SHL, SHR
+ * - Rotates: ROL, ROR
+ * 
  * TODO [R1-D]: Implement SAR (Shift Arithmetic Right - preserves sign bit)
  * TODO [R1-D]: Implement RCL/RCR (Rotate through Carry)
  * TODO [R1-D]: Implement Parity Flag (PF) calculation in _updateLogicalFlags
+ * TODO [R1-D]: Implement OF, AF, PF flag updates for ADD/SUB operations
+ * TODO [R1-D]: Implement OF for NEG (Overflow if negating 0x8000)
  */
 import { FLAGS } from './registers.js';
 
@@ -19,7 +27,8 @@ export class ALU {
 
     /**
      * Standard 16-bit Addition
-     * Sets: ZF, SF, CF. TODO: Implement OF, AF, PF
+     * Sets: ZF, SF, CF
+     * TODO: Implement OF, AF, PF flags
      */
     add16(val1, val2) {
         const result = (val1 + val2) & 0xFFFF;

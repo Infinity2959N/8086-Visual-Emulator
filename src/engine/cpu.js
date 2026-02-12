@@ -1,3 +1,21 @@
+/**
+ * 8086 CPU Emulator
+ * 
+ * Currently Implemented Instructions:
+ * - Data Transfer: MOV (reg16,imm16 / reg16,mem16), PUSH (reg16), POP (reg16), XCHG (reg16,reg16 / reg16,mem16), LEA (reg16,mem16)
+ * - Arithmetic: ADD (AX,imm16), MUL (mem/reg16), DIV (mem/reg16), IMUL (mem/reg16), IDIV (mem/reg16), NOT (mem/reg16), NEG (mem/reg16)
+ * - Logical: TEST (mem/reg16,imm16)
+ * - Control Flow: JZ/JE, JNZ/JNE, JC, JNC, CALL (rel16), RET
+ * - System: NOP, HLT, CLC, STC, CMC
+ * 
+ * TODO: Missing instruction opcodes for the following planned instructions:
+ * - Data Transfer: MOV (additional variants)
+ * - Arithmetic: SUB, INC, DEC, CMP, ADD (additional variants)
+ * - Logical: AND, OR, XOR (main opcodes)
+ * - String Operations: MOVSB, LODSB, STOSB, CMPSB
+ * - Control Flow: JMP (unconditional)
+ * - Shifts/Rotates: ROL, ROR, SHL, SHR (opcodes - ALU methods exist)
+ */
 import { Registers, FLAGS } from './registers.js';
 import { Memory } from './memory.js';
 import { ALU } from './alu.js';
