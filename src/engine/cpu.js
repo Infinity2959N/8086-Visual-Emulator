@@ -254,9 +254,9 @@ export class CPU {
                     this.registers.set16(destReg, this.registers.get16(regNames[rm]));
                 } else {
                     // Memory-to-Register move
-                    const offset = this.resolveEffectiveAddress(mod, rm);
-                    const ds = this.registers.get16('DS'); // Default segment
-                    const value = (this.memory.readByte(ds, offset + 1) << 8) | this.memory.readByte(ds, offset);
+                    const { offset, segment } = this.resolveEffectiveAddress(mod, rm);
+                    const segVal = this.registers.get16(segment);
+                    const value = (this.memory.readByte(segVal, offset + 1) << 8) | this.memory.readByte(segVal, offset);
                     this.registers.set16(destReg, value);
                 }
                 break;
