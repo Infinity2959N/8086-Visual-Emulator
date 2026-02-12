@@ -95,7 +95,7 @@ export class CPU {
     }
 
     /*
-    * Stack Opeerations (PUSH/POP)
+    * Stack Operations (PUSH/POP)
     * Ref: Ticket [R1-C]
     */
     push16(value) {
