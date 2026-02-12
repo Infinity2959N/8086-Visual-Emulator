@@ -1,0 +1,30 @@
+name: Code Quality Check
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install Node.js dependencies
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          elif [ -f package.json ]; then
+            npm install
+          else
+            npm init -y
+            npm install --save-dev eslint@8.57.0
+          fi
+      - name: Run ESLint
+        run: |
+          if npm run | grep -q "lint"; then
+            npm run lint -- --fix-dry-run
+          else
+            npx eslint@8.57.0 "src/**/*.js" --fix-dry-run
+          fi
+        continue-on-error: true # Don't block them yet, just warn
