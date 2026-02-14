@@ -82,4 +82,15 @@ const sar1 = alu.sar16(0x8001, 1);
 assert.strictEqual(sar1, 0xC000, 'sar16 preserves sign');
 assert.strictEqual(regs.getFlag(FLAGS.CF), 1, 'CF set on SAR shift-out');
 
+// RCL/RCR (rotate through carry)
+regs.setFlag(FLAGS.CF, 1);
+const rcl1 = alu.rcl16(0x0001, 1); // 0x0001 << 1 | CF(1) = 0x0003
+assert.strictEqual(rcl1, 0x0003, 'rcl16 rotates through carry');
+assert.strictEqual(regs.getFlag(FLAGS.CF), 0, 'CF updated by RCL');
+
+regs.setFlag(FLAGS.CF, 1);
+const rcr1 = alu.rcr16(0x0002, 1); // 0x0002 >> 1 | CF(1) << 15 = 0x8001
+assert.strictEqual(rcr1, 0x8001, 'rcr16 rotates through carry');
+assert.strictEqual(regs.getFlag(FLAGS.CF), 0, 'CF updated by RCR');
+
 console.log('tests/engine/test_alu.js: all assertions passed');

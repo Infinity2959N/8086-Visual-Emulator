@@ -28,3 +28,24 @@ jobs:
             npx eslint@8.57.0 "src/**/*.js" --fix-dry-run
           fi
         continue-on-error: true # Don't block them yet, just warn
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          elif [ -f package.json ]; then
+            npm install
+          fi
+      - name: Run unit tests
+        run: |
+          node tests/engine/test_alu.js
+          node tests/engine/test_cpu.js
+          node tests/engine/test1.js

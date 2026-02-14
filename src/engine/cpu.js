@@ -3,18 +3,18 @@
  * 
  * Currently Implemented Instructions:
  * - Data Transfer: MOV (reg16,imm16 / reg16,mem16), PUSH (reg16), POP (reg16), XCHG (reg16,reg16 / reg16,mem16), LEA (reg16,mem16)
- * - Arithmetic: ADD (AX,imm16), MUL (mem/reg16), DIV (mem/reg16), IMUL (mem/reg16), IDIV (mem/reg16), NOT (mem/reg16), NEG (mem/reg16)
- * - Logical: TEST (mem/reg16,imm16)
+ * - Arithmetic: ADD (AX,imm16), SUB (AX,imm16), INC (reg16), DEC (reg16), CMP (AX,imm16), MUL/IMUL/DIV/IDIV (mem/reg16), NEG (mem/reg16)
+ * - Logical: AND/OR/XOR (AX,imm16), NOT (mem/reg16), TEST (mem/reg16,imm16)
+ * - Shifts/Rotates: SHL, SHR, SAR, ROL, ROR, RCL, RCR (mem/reg16, 1 or CL)
  * - Control Flow: JZ/JE, JNZ/JNE, JC, JNC, CALL (rel16), RET
  * - System: NOP, HLT, CLC, STC, CMC
  * 
  * TODO: Missing instruction opcodes for the following planned instructions:
- * - Data Transfer: MOV (additional variants)
- * - Arithmetic: SUB, INC, DEC, CMP, ADD (additional variants)
- * - Logical: AND, OR, XOR (main opcodes)
+ * - Data Transfer: MOV (additional variants: mem,reg / reg,mem with different ModR/M modes)
+ * - Arithmetic: ADD/SUB/CMP (additional ModR/M forms)
+ * - Logical: AND/OR/XOR (additional ModR/M forms)
  * - String Operations: MOVSB, LODSB, STOSB, CMPSB
- * - Control Flow: JMP (unconditional)
- * - Shifts/Rotates: ROL, ROR, SHL, SHR (opcodes - ALU methods exist)
+ * - Control Flow: JMP (unconditional), more conditional jumps
  */
 import { Registers, FLAGS } from './registers.js';
 import { Memory } from './memory.js';
@@ -221,6 +221,65 @@ export class CPU {
                 const name = regNames[regIndex];
                 const newVal = this.alu.dec16(this.registers.get16(name));
                 this.registers.set16(name, newVal);
+                break;
+            }
+
+            // Shift/Rotate Group 2 (0xD0/0xD1 = shift by 1, 0xD2/0xD3 = shift by CL)
+            case 0xD0: case 0xD1: case 0xD2: case 0xD3: {
+                const modRM = this.fetchByte();
+                const mod = (modRM >> 6) & 0x03;
+                const extension = (modRM >> 3) & 0x07;
+                const rm = modRM & 0x07;
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                
+                // Determine shift count
+                let count;
+                if (opcode === 0xD0 || opcode === 0xD1) {
+                    count = 1;
+                } else { // 0xD2 or 0xD3
+                    count = this.registers.get8('CL');
+                }
+                
+                // 16-bit operations only (0xD1/0xD3)
+                const is16bit = (opcode === 0xD1 || opcode === 0xD3);
+                if (!is16bit) {
+                    console.error(`8-bit shift/rotate (${opcode.toString(16)}) not yet implemented`);
+                    break;
+                }
+                
+                let operand, offset, segment;
+                
+                // Fetch operand
+                if (mod === 3) {
+                    operand = this.registers.get16(regNames[rm]);
+                } else {
+                    const ea = this.resolveEffectiveAddress(mod, rm);
+                    offset = ea.offset;
+                    segment = ea.segment;
+                    const segVal = this.registers.get16(segment);
+                    const low = this.memory.readByte(segVal, offset);
+                    const high = this.memory.readByte(segVal, offset + 1);
+                    operand = (high << 8) | low;
+                }
+                
+                let result;
+                switch (extension) {
+                    case 0: result = this.alu.rol16(operand, count); break; // ROL
+                    case 1: result = this.alu.ror16(operand, count); break; // ROR
+                    case 2: result = this.alu.rcl16(operand, count); break; // RCL
+                    case 3: result = this.alu.rcr16(operand, count); break; // RCR
+                    case 4: result = this.alu.shl16(operand, count); break; // SHL/SAL
+                    case 5: result = this.alu.shr16(operand, count); break; // SHR
+                    case 7: result = this.alu.sar16(operand, count); break; // SAR
+                    default:
+                        console.error(`Unsupported shift/rotate extension ${extension}`);
+                        break;
+                }
+                
+                // Write back
+                if (result !== undefined) {
+                    this._writeBack16(mod, rm, regNames[rm], offset, segment, result);
+                }
                 break;
             }
 

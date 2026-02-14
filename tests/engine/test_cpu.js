@@ -79,4 +79,28 @@ cpu.memory.writeByte(0, 22, 0x00);
 cpu.step();
 assert.strictEqual(cpu.registers.get16('AX'), 0x0000, 'XOR AX imm executed');
 
+// Shift/Rotate via CPU opcodes (0xD1 = shift by 1, 0xD3 = shift by CL)
+// ROL BX, 1 (0xD1 /0)
+cpu.registers.set16('BX', 0x8001);
+cpu.memory.writeByte(0, 23, 0xD1); // shift group
+cpu.memory.writeByte(0, 24, 0xC3); // ModR/M: mod=3, ext=0 (ROL), rm=3 (BX)
+cpu.step();
+assert.strictEqual(cpu.registers.get16('BX'), 0x0003, 'ROL BX, 1 executed');
+assert.strictEqual(cpu.registers.getFlag(FLAGS.CF), 1, 'CF set by ROL');
+
+// SHL DX, CL (0xD3 /4) - use DX as target since we're setting CL
+cpu.registers.set8('CL', 4);
+cpu.registers.set16('DX', 0x0001);
+cpu.memory.writeByte(0, 25, 0xD3); // shift by CL
+cpu.memory.writeByte(0, 26, 0xE2); // ModR/M: mod=3, ext=4 (SHL), rm=2 (DX)
+cpu.step();
+assert.strictEqual(cpu.registers.get16('DX'), 0x0010, 'SHL DX, CL executed'); // 1 << 4 = 16 (0x10)
+
+// SAR AX, 1 (0xD1 /7) - use AX since DX was used above
+cpu.registers.set16('AX', 0x8000);
+cpu.memory.writeByte(0, 27, 0xD1);
+cpu.memory.writeByte(0, 28, 0xF8); // ModR/M: mod=3, ext=7 (SAR), rm=0 (AX)
+cpu.step();
+assert.strictEqual(cpu.registers.get16('AX'), 0xC000, 'SAR AX, 1 preserves sign');
+
 console.log('tests/engine/test_cpu.js: all assertions passed');

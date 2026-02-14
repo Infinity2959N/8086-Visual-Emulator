@@ -3,19 +3,10 @@
  * Handles arithmetic, logical operations, and Flag updates.
  * 
  * Implemented Instructions:
- * - Arithmetic: ADD, SUB, INC, DEC, CMP, MUL, DIV, IMUL, IDIV, NEG
- * - Logical: AND, OR, XOR, NOT, TEST
- * - Shifts: SHL, SHR
- * - Rotates: ROL, ROR
- * 
- * TODO [R1-D]: Implement SAR (Shift Arithmetic Right - preserves sign bit)
- * TODO [R1-D]: Implement RCL/RCR (Rotate through Carry)
- * TODO [R1-D]: Implement Parity Flag (PF) calculation in _updateLogicalFlags
- * TODO [R1-D]: Implement OF, AF, PF flag updates for ADD/SUB operations
- * TODO [R1-D]: Implement OF for NEG (Overflow if negating 0x8000)
- * TODO [R1-D]: Implement Signed Math (IMUL/IDIV)
- * TODO [R1-D]: Implement Bitwise Rotates (ROL/ROR)
- * TODO [R1-D]: Implement Bitwise Shifts (SHL/SHR)
+ * - Arithmetic: ADD, SUB, INC, DEC, CMP, MUL, DIV, IMUL, IDIV, NEG (all with full flag support: ZF, SF, CF, OF, AF, PF)
+ * - Logical: AND, OR, XOR, NOT, TEST (with ZF, SF, PF; CF/OF cleared)
+ * - Shifts: SHL, SHR, SAR
+ * - Rotates: ROL, ROR, RCL, RCR
  */
 import { FLAGS } from './registers.js';
 
@@ -345,6 +336,36 @@ export class ALU {
         for (let i = 0; i < count; i++) {
             const lsb = result & 0x0001;
             result = ((result >>> 1) | (lsb << 15)) & 0xFFFF;
+            this.registers.setFlag(FLAGS.CF, lsb === 1);
+        }
+        return result;
+    }
+
+    /**
+     * Rotate Left through Carry (RCL)
+     * Rotates bits left through CF; CF becomes bit 0, bit 15 goes to CF
+     */
+    rcl16(val, count) {
+        let result = val;
+        for (let i = 0; i < count; i++) {
+            const msb = (result & 0x8000) >> 15;
+            const currentCF = this.registers.getFlag(FLAGS.CF);
+            result = ((result << 1) | currentCF) & 0xFFFF;
+            this.registers.setFlag(FLAGS.CF, msb === 1);
+        }
+        return result;
+    }
+
+    /**
+     * Rotate Right through Carry (RCR)
+     * Rotates bits right through CF; CF becomes bit 15, bit 0 goes to CF
+     */
+    rcr16(val, count) {
+        let result = val;
+        for (let i = 0; i < count; i++) {
+            const lsb = result & 0x0001;
+            const currentCF = this.registers.getFlag(FLAGS.CF);
+            result = ((result >>> 1) | (currentCF << 15)) & 0xFFFF;
             this.registers.setFlag(FLAGS.CF, lsb === 1);
         }
         return result;
