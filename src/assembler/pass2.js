@@ -1,7 +1,7 @@
 // pass2.js
-const instructionMap = require("./instructionMap");
-const registers = require("./registers");
-const { isRegister, isImmediate, toLittleEndian16 } = require("./utils");
+import instructionMap from "./instructionMap.js";
+import registers from "./registers.js";
+import { isRegister, isImmediate, toLittleEndian16 } from "./utils.js";
 
 function buildModRM(reg, rm) {
   return (0b11 << 6) | (reg << 3) | rm;
@@ -17,7 +17,7 @@ function detectInstructionKey(mnemonic, operands = []) {
   return mnemonic;
 }
 
-function pass2(parsedLines, symbolTable) {
+export default function pass2(parsedLines, symbolTable) {
   const machineCode = [];
   let currentOffset = 0;
 
@@ -76,5 +76,3 @@ function pass2(parsedLines, symbolTable) {
   // Day 11 Requirement: Return as Uint8Array
   return new Uint8Array(machineCode);
 }
-
-module.exports = pass2;

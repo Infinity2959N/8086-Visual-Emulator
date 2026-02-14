@@ -1,5 +1,5 @@
 // parser.js
-function parser(lines) {
+export default function parser(lines) {
   const parsed = [];
 
   for (let line of lines) {
@@ -38,5 +38,3 @@ function parser(lines) {
 
   return parsed;
 }
-
-module.exports = parser;

@@ -1,12 +1,12 @@
-const assemble = require("./assembler");
-const { toHexString } = require("./utils");
+import assemble from "./assembler.js";
+import { toHexString } from "./utils.js";
 
 /**
  * Main entry point for the Assembler module.
  * @param {string} source - The raw assembly text.
  * @returns {object} - Contains the machineCode (Uint8Array) and symbolTable.
  */
-function runAssembler(source) {
+export default function runAssembler(source) {
   try {
     const result = assemble(source);
     
@@ -18,5 +18,3 @@ function runAssembler(source) {
     throw new Error(`Assembly Error: ${error.message}`);
   }
 }
-
-module.exports = runAssembler;

@@ -1,6 +1,6 @@
 // registers.js
 
-module.exports = {
+export default {
   AX: 0b000,
   CX: 0b001,
   DX: 0b010,

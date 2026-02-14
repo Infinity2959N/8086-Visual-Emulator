@@ -1,7 +1,7 @@
 // symbolTable.js
 
-const instructionMap = require("./instructionMap");
-const { isRegister, isImmediate } = require("./utils");
+import instructionMap from "./instructionMap.js";
+import { isRegister, isImmediate } from "./utils.js";
 
 function detectInstructionKey(mnemonic, operands = []) {
   if (operands.length === 2) {
@@ -23,7 +23,7 @@ function detectInstructionKey(mnemonic, operands = []) {
   return mnemonic; // fallback (JMP, NOP, etc.)
 }
 
-function buildSymbolTable(parsedLines) {
+export default function buildSymbolTable(parsedLines) {
   const symbolTable = {};
   let offset = 0;
 
@@ -48,5 +48,3 @@ function buildSymbolTable(parsedLines) {
 
   return symbolTable;
 }
-
-module.exports = buildSymbolTable;

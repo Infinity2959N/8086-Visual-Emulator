@@ -1,6 +1,6 @@
 // Builds ModR/M byte for register-to-register operations
 
-function buildModRM(regField, rmField) {
+export default function buildModRM(regField, rmField) {
   const mod = 0b11; // register mode
 
   const modrm =
@@ -10,5 +10,3 @@ function buildModRM(regField, rmField) {
 
   return modrm;
 }
-
-module.exports = buildModRM;
