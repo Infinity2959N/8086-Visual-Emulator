@@ -46,4 +46,40 @@ assert.strictEqual(regs.getFlag(FLAGS.ZF), 1, 'ZF set when result is zero');
 // not16
 assert.strictEqual(alu.not16(0x00FF), 0xFF00, 'not16 inverts bits');
 
+// Parity flag (PF) - low byte parity
+alu.xor16(0x0003, 0x0000); // 0x03 has two bits set -> even
+assert.strictEqual(regs.getFlag(FLAGS.PF), 1, 'PF even parity for 0x03');
+alu.xor16(0x0001, 0x0000); // 0x01 has one bit set -> odd
+assert.strictEqual(regs.getFlag(FLAGS.PF), 0, 'PF odd parity for 0x01');
+
+// add16 OF/AF
+regs.set16('FLAGS', 0);
+alu.add16(0x7FFF, 1);
+assert.strictEqual(regs.getFlag(FLAGS.OF), 1, 'OF set on signed overflow for add16');
+assert.strictEqual(regs.getFlag(FLAGS.AF), 1, 'AF set on nibble carry for add16');
+
+// sub16 OF/AF
+regs.set16('FLAGS', 0);
+alu.sub16(0x8000, 1);
+assert.strictEqual(regs.getFlag(FLAGS.OF), 1, 'OF set on signed overflow for sub16');
+assert.strictEqual(regs.getFlag(FLAGS.AF), 1, 'AF set on borrow for sub16');
+
+// neg16 OF
+regs.set16('FLAGS', 0);
+alu.neg16(0x8000);
+assert.strictEqual(regs.getFlag(FLAGS.OF), 1, 'OF set when negating 0x8000');
+
+// INC/DEC affect OF as expected
+regs.set16('FLAGS', 0);
+alu.inc16(0x7FFF);
+assert.strictEqual(regs.getFlag(FLAGS.OF), 1, 'INC sets OF on overflow');
+regs.set16('FLAGS', 0);
+alu.dec16(0x8000);
+assert.strictEqual(regs.getFlag(FLAGS.OF), 1, 'DEC sets OF on overflow');
+
+// SAR (arithmetic shift right)
+const sar1 = alu.sar16(0x8001, 1);
+assert.strictEqual(sar1, 0xC000, 'sar16 preserves sign');
+assert.strictEqual(regs.getFlag(FLAGS.CF), 1, 'CF set on SAR shift-out');
+
 console.log('tests/engine/test_alu.js: all assertions passed');

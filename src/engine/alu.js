@@ -13,7 +13,7 @@
  * TODO [R1-D]: Implement Parity Flag (PF) calculation in _updateLogicalFlags
  * TODO [R1-D]: Implement OF, AF, PF flag updates for ADD/SUB operations
  * TODO [R1-D]: Implement OF for NEG (Overflow if negating 0x8000)
- * * TODO [R1-D]: Implement Signed Math (IMUL/IDIV)
+ * TODO [R1-D]: Implement Signed Math (IMUL/IDIV)
  * TODO [R1-D]: Implement Bitwise Rotates (ROL/ROR)
  * TODO [R1-D]: Implement Bitwise Shifts (SHL/SHR)
  */
@@ -30,27 +30,65 @@ export class ALU {
 
     /**
      * Standard 16-bit Addition
-     * Sets: ZF, SF, CF
-     * TODO: Implement OF, AF, PF flags
-     * Sets: ZF, SF, CF. TODO: Implement OF, AF, PF
+     * Sets: ZF, SF, CF, AF, OF, PF
      */
     add16(val1, val2) {
-        const result = (val1 + val2) & 0xFFFF;
+        const full = (val1 + val2) >>> 0;
+        const result = full & 0xFFFF;
+
+        // Zero / Sign
         this.registers.setFlag(FLAGS.ZF, result === 0);
         this.registers.setFlag(FLAGS.SF, (result & 0x8000) !== 0);
-        this.registers.setFlag(FLAGS.CF, (val1 + val2) > 0xFFFF);
+
+        // Carry (unsigned)
+        this.registers.setFlag(FLAGS.CF, full > 0xFFFF);
+
+        // Auxiliary carry (nibble)
+        const af = ((val1 & 0xF) + (val2 & 0xF)) > 0xF;
+        this.registers.setFlag(FLAGS.AF, af);
+
+        // Overflow (signed): true when sign of result differs from operands when operands had same sign
+        const of = (((val1 ^ result) & (val2 ^ result)) & 0x8000) !== 0;
+        this.registers.setFlag(FLAGS.OF, of);
+
+        // Parity (low byte) - PF = 1 if even number of 1 bits in least-significant byte
+        const byte = result & 0xFF;
+        let cnt = 0;
+        for (let i = 0; i < 8; i++) { if (byte & (1 << i)) cnt++; }
+        this.registers.setFlag(FLAGS.PF, (cnt % 2) === 0);
+
         return result;
     }
 
     /**
      * Standard 16-bit Subtraction
-     * Sets: ZF, SF, CF (Borrow)
+     * Sets: ZF, SF, CF (Borrow), AF, OF, PF
      */
     sub16(val1, val2) {
-        const result = (val1 - val2) & 0xFFFF;
+        const full = (val1 - val2) | 0; // allow signed-like JS behavior but keep low 16 bits for result
+        const result = full & 0xFFFF;
+
+        // Zero / Sign
         this.registers.setFlag(FLAGS.ZF, result === 0);
         this.registers.setFlag(FLAGS.SF, (result & 0x8000) !== 0);
-        this.registers.setFlag(FLAGS.CF, val1 < val2);
+
+        // Carry/Borrow for subtraction
+        this.registers.setFlag(FLAGS.CF, (val1 >>> 0) < (val2 >>> 0));
+
+        // Auxiliary borrow from bit 4
+        const af = (val1 & 0xF) < (val2 & 0xF);
+        this.registers.setFlag(FLAGS.AF, af);
+
+        // Overflow (signed): when signs of operands differ and sign of result differs from sign of val1
+        const of = (((val1 ^ val2) & (val1 ^ result)) & 0x8000) !== 0;
+        this.registers.setFlag(FLAGS.OF, of);
+
+        // Parity
+        const byte = result & 0xFF;
+        let cnt = 0;
+        for (let i = 0; i < 8; i++) { if (byte & (1 << i)) cnt++; }
+        this.registers.setFlag(FLAGS.PF, (cnt % 2) === 0);
+
         return result;
     }
 
@@ -100,7 +138,12 @@ export class ALU {
         const result = (val + 1) & 0xFFFF;
         this.registers.setFlag(FLAGS.ZF, result === 0);
         this.registers.setFlag(FLAGS.SF, (result & 0x8000) !== 0);
-        // CF not affected by INC
+        // INC does not affect CF, but affects OF/AF/PF
+        this.registers.setFlag(FLAGS.OF, val === 0x7FFF);
+        this.registers.setFlag(FLAGS.AF, ((val & 0xF) + 1) > 0xF);
+        // Parity
+        const byte = result & 0xFF; let cnt = 0; for (let i = 0; i < 8; i++) { if (byte & (1 << i)) cnt++; }
+        this.registers.setFlag(FLAGS.PF, (cnt % 2) === 0);
         return result;
     }
 
@@ -108,7 +151,11 @@ export class ALU {
         const result = (val - 1) & 0xFFFF;
         this.registers.setFlag(FLAGS.ZF, result === 0);
         this.registers.setFlag(FLAGS.SF, (result & 0x8000) !== 0);
-        // CF not affected by DEC
+        // DEC does not affect CF, but affects OF/AF/PF
+        this.registers.setFlag(FLAGS.OF, val === 0x8000);
+        this.registers.setFlag(FLAGS.AF, (val & 0xF) === 0);
+        const byte = result & 0xFF; let cnt = 0; for (let i = 0; i < 8; i++) { if (byte & (1 << i)) cnt++; }
+        this.registers.setFlag(FLAGS.PF, (cnt % 2) === 0);
         return result;
     }
 
@@ -126,7 +173,13 @@ export class ALU {
         this.registers.setFlag(FLAGS.CF, val !== 0);
         this.registers.setFlag(FLAGS.ZF, result === 0);
         this.registers.setFlag(FLAGS.SF, (result & 0x8000) !== 0);
-        // TODO: Implement OF for NEG (Overflow if negating 0x8000)
+        // AF: borrow from bit 4 when low nibble != 0
+        this.registers.setFlag(FLAGS.AF, (val & 0xF) !== 0);
+        // OF: overflow when negating 0x8000
+        this.registers.setFlag(FLAGS.OF, val === 0x8000);
+        // Parity
+        const byte = result & 0xFF; let cnt = 0; for (let i = 0; i < 8; i++) { if (byte & (1 << i)) cnt++; }
+        this.registers.setFlag(FLAGS.PF, (cnt % 2) === 0);
         return result;
     }
 
@@ -250,6 +303,26 @@ export class ALU {
     }
 
     /**
+     * Arithmetic Shift Right (SAR)
+     * Preserves sign bit; sets CF to last bit shifted out and clears OF.
+     */
+    sar16(val, count) {
+        if (count === 0) return val & 0xFFFF;
+        // Work with signed 32-bit to preserve sign while shifting
+        let result = (val << 16) >> 16; // sign-extend to 32-bit signed
+        let lastBitOut = 0;
+        for (let i = 0; i < count; i++) {
+            lastBitOut = result & 0x0001;
+            result = result >> 1; // arithmetic shift
+        }
+        result = result & 0xFFFF;
+        this.registers.setFlag(FLAGS.CF, lastBitOut === 1);
+        this.registers.setFlag(FLAGS.OF, 0);
+        this._updateLogicalFlags(result);
+        return result;
+    }
+
+    /**
      * Rotate Left (ROL)
      * Sets: CF (contains the bit that rotated around)
      */
@@ -284,6 +357,11 @@ export class ALU {
     _updateLogicalFlags(result) {
         this.registers.setFlag(FLAGS.ZF, result === 0);
         this.registers.setFlag(FLAGS.SF, (result & 0x8000) !== 0);
+        // Parity flag (PF) - set when least-significant byte has even number of 1 bits
+        const byte = result & 0xFF;
+        let cnt = 0;
+        for (let i = 0; i < 8; i++) { if (byte & (1 << i)) cnt++; }
+        this.registers.setFlag(FLAGS.PF, (cnt % 2) === 0);
         // Leave CF/OF unchanged here; callers that need to set them should do so explicitly.
     }
 }

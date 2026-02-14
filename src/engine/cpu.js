@@ -162,6 +162,68 @@ export class CPU {
                 break;
             }
 
+            // SUB AX, imm16 (Opcode 0x2D)
+            case 0x2D: {
+                const val1 = this.registers.get16('AX');
+                const val2 = this.fetchWord();
+                const res = this.alu.sub16(val1, val2);
+                this.registers.set16('AX', res);
+                break;
+            }
+
+            // CMP AX, imm16 (Opcode 0x3D) - sets flags only
+            case 0x3D: {
+                const imm = this.fetchWord();
+                this.alu.cmp16(this.registers.get16('AX'), imm);
+                break;
+            }
+
+            // AND AX, imm16 (Opcode 0x25)
+            case 0x25: {
+                const imm = this.fetchWord();
+                const res = this.alu.and16(this.registers.get16('AX'), imm);
+                this.registers.set16('AX', res);
+                break;
+            }
+
+            // OR AX, imm16 (Opcode 0x0D)
+            case 0x0D: {
+                const imm = this.fetchWord();
+                const res = this.alu.or16(this.registers.get16('AX'), imm);
+                this.registers.set16('AX', res);
+                break;
+            }
+
+            // XOR AX, imm16 (Opcode 0x35)
+            case 0x35: {
+                const imm = this.fetchWord();
+                const res = this.alu.xor16(this.registers.get16('AX'), imm);
+                this.registers.set16('AX', res);
+                break;
+            }
+
+            // INC reg16 (Opcodes 0x40 - 0x47)
+            case 0x40: case 0x41: case 0x42: case 0x43:
+            case 0x44: case 0x45: case 0x46: case 0x47: {
+                const regIndex = opcode - 0x40;
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                const name = regNames[regIndex];
+                const newVal = this.alu.inc16(this.registers.get16(name));
+                this.registers.set16(name, newVal);
+                break;
+            }
+
+            // DEC reg16 (Opcodes 0x48 - 0x4F)
+            case 0x48: case 0x49: case 0x4A: case 0x4B:
+            case 0x4C: case 0x4D: case 0x4E: case 0x4F: {
+                const regIndex = opcode - 0x48;
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                const name = regNames[regIndex];
+                const newVal = this.alu.dec16(this.registers.get16(name));
+                this.registers.set16(name, newVal);
+                break;
+            }
+
             // MUL/DIV (Grouped under opcode 0xF7)
             case 0xF7: { // Group 3: TEST, NOT, NEG, MUL, IMUL, DIV, IDIV (16-bit)
                 const modRM = this.fetchByte();

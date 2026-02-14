@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { CPU } from '../../src/engine/cpu.js';
+import { FLAGS } from '../../src/engine/registers.js';
 
 const cpu = new CPU();
 
@@ -30,5 +31,52 @@ assert.strictEqual((high << 8) | low, 0xBEEF, 'value written to stack');
 const popped = cpu.pop16();
 assert.strictEqual(popped, 0xBEEF, 'pop16 returns pushed value');
 assert.strictEqual(cpu.registers.get16('SP'), 0xFFFE, 'SP restored after pop');
+
+// SUB AX, imm16 (opcode 0x2D)
+cpu.memory.writeByte(0, 6, 0x2D); // SUB AX, imm16
+cpu.memory.writeByte(0, 7, 0x02);
+cpu.memory.writeByte(0, 8, 0x00); // subtract 2
+cpu.step();
+assert.strictEqual(cpu.registers.get16('AX'), 0x1233, 'SUB AX, imm16 executed');
+
+// CMP AX, imm16 (opcode 0x3D)
+cpu.memory.writeByte(0, 9, 0x3D);
+cpu.memory.writeByte(0, 10, 0x33);
+cpu.memory.writeByte(0, 11, 0x12); // compare with 0x1233
+cpu.step();
+assert.strictEqual(cpu.registers.getFlag(FLAGS.ZF), 1, 'CMP AX, imm16 sets ZF on equality');
+
+// INC CX (0x41) / DEC DX (0x4A)
+cpu.registers.set16('CX', 0x7FFF);
+cpu.memory.writeByte(0, 12, 0x41); // INC CX
+cpu.step();
+assert.strictEqual(cpu.registers.get16('CX'), 0x8000, 'INC CX executed');
+assert.strictEqual(cpu.registers.getFlag(FLAGS.OF), 1, 'INC sets OF on overflow');
+
+cpu.registers.set16('DX', 0x8000);
+cpu.memory.writeByte(0, 13, 0x4A); // DEC DX
+cpu.step();
+assert.strictEqual(cpu.registers.get16('DX'), 0x7FFF, 'DEC DX executed');
+assert.strictEqual(cpu.registers.getFlag(FLAGS.OF), 1, 'DEC sets OF on overflow');
+
+// AND/OR/XOR AX, imm16
+cpu.registers.set16('AX', 0x00FF);
+cpu.memory.writeByte(0, 14, 0x25); // AND AX, imm16
+cpu.memory.writeByte(0, 15, 0x0F);
+cpu.memory.writeByte(0, 16, 0x00);
+cpu.step();
+assert.strictEqual(cpu.registers.get16('AX'), 0x000F, 'AND AX imm executed');
+
+cpu.memory.writeByte(0, 17, 0x0D); // OR AX, imm16
+cpu.memory.writeByte(0, 18, 0xF0);
+cpu.memory.writeByte(0, 19, 0x00);
+cpu.step();
+assert.strictEqual(cpu.registers.get16('AX'), 0x00FF, 'OR AX imm executed');
+
+cpu.memory.writeByte(0, 20, 0x35); // XOR AX, imm16
+cpu.memory.writeByte(0, 21, 0xFF);
+cpu.memory.writeByte(0, 22, 0x00);
+cpu.step();
+assert.strictEqual(cpu.registers.get16('AX'), 0x0000, 'XOR AX imm executed');
 
 console.log('tests/engine/test_cpu.js: all assertions passed');
