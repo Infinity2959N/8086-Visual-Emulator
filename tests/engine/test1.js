@@ -1,0 +1,1 @@
+import assert from 'node:assert';\nimport { ALU } from '../../src/engine/alu.js';\n\nassert.ok(typeof ALU === 'function', 'ALU should be exported from src/engine/alu.js');\nconsole.log('tests/engine/test1.js: basic smoke check passed');
