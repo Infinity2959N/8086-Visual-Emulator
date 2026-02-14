@@ -13,6 +13,9 @@
  * TODO [R1-D]: Implement Parity Flag (PF) calculation in _updateLogicalFlags
  * TODO [R1-D]: Implement OF, AF, PF flag updates for ADD/SUB operations
  * TODO [R1-D]: Implement OF for NEG (Overflow if negating 0x8000)
+ * * TODO [R1-D]: Implement Signed Math (IMUL/IDIV)
+ * TODO [R1-D]: Implement Bitwise Rotates (ROL/ROR)
+ * TODO [R1-D]: Implement Bitwise Shifts (SHL/SHR)
  */
 import { FLAGS } from './registers.js';
 
@@ -29,6 +32,7 @@ export class ALU {
      * Standard 16-bit Addition
      * Sets: ZF, SF, CF
      * TODO: Implement OF, AF, PF flags
+     * Sets: ZF, SF, CF. TODO: Implement OF, AF, PF
      */
     add16(val1, val2) {
         const result = (val1 + val2) & 0xFFFF;
@@ -272,6 +276,9 @@ export class ALU {
         }
         return result;
     }
+     * TODO: Implement NOT (Bitwise inversion)
+     * Note: NOT does NOT affect any flags.
+     */
 
     // ==========================================
     // INTERNAL HELPERS
