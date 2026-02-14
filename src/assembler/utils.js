@@ -1,8 +1,8 @@
 // utils.js
-const registers = require("./registers");
+import registers from "./registers.js";
 
 function isRegister(op) {
-  return registers.hasOwnProperty(op.toUpperCase());
+  return Object.hasOwn(registers, op.toUpperCase());
 }
 
 function isImmediate(op) {
@@ -20,7 +20,7 @@ function toHexString(byteArray) {
     .join(' ');
 }
 
-module.exports = {
+export {
   isRegister,
   isImmediate,
   toLittleEndian16,

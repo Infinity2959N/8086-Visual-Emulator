@@ -1,9 +1,9 @@
-const lexer = require("./lexer");
-const parser = require("./parser");
-const buildSymbolTable = require("./symbolTable");
-const pass2 = require("./pass2");
+import lexer from "./lexer.js";
+import parser from "./parser.js";
+import buildSymbolTable from "./symbolTable.js";
+import pass2 from "./pass2.js";
 
-function assemble(code) {
+export default function assemble(code) {
 
   const tokens = lexer(code);
   const parsed = parser(tokens);
@@ -13,5 +13,3 @@ function assemble(code) {
 
   return { symbolTable, machineCode };
 }
-
-module.exports = assemble;

@@ -1,7 +1,7 @@
 // lexer.js
 // Converts raw assembly text into cleaned line tokens
 
-function lexer(code) {
+export default function lexer(code) {
   const lines = code.split("\n");
 
   const tokens = [];
@@ -26,5 +26,3 @@ function lexer(code) {
 
   return tokens;
 }
-
-module.exports = lexer;
