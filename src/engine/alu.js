@@ -276,9 +276,6 @@ export class ALU {
         }
         return result;
     }
-     * TODO: Implement NOT (Bitwise inversion)
-     * Note: NOT does NOT affect any flags.
-     */
 
     // ==========================================
     // INTERNAL HELPERS
@@ -287,7 +284,6 @@ export class ALU {
     _updateLogicalFlags(result) {
         this.registers.setFlag(FLAGS.ZF, result === 0);
         this.registers.setFlag(FLAGS.SF, (result & 0x8000) !== 0);
-        this.registers.setFlag(FLAGS.CF, 0); 
-        this.registers.setFlag(FLAGS.OF, 0); 
+        // Leave CF/OF unchanged here; callers that need to set them should do so explicitly.
     }
 }

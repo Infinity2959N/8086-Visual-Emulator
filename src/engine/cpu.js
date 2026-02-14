@@ -214,19 +214,7 @@ export class CPU {
                         break;
                     default:
                         console.error(`Undefined extension ${extension} for 0xF7`);
-            case 0xF7: {
-                const modRM = this.fetchByte();
-                const regIndex = modRM & 0x07; // Destination register bits
-                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
-                const operand = this.registers.get16(regNames[regIndex]);
-
-                // Bits 5-3 of ModR/M determine the actual sub-instruction
-                const extension = (modRM >> 3) & 0x07;
-                
-                if (extension === 4) { // MUL
-                    this.alu.mul16(operand);
-                } else if (extension === 6) { // DIV
-                    this.alu.div16(operand);
+                        break;
                 }
                 break;
             }
