@@ -1,3 +1,21 @@
+/**
+ * 8086 CPU Emulator
+ * 
+ * Currently Implemented Instructions:
+ * - Data Transfer: MOV (reg16,imm16 / reg16,mem16), PUSH (reg16), POP (reg16), XCHG (reg16,reg16 / reg16,mem16), LEA (reg16,mem16)
+ * - Arithmetic: ADD (AX,imm16), MUL (mem/reg16), DIV (mem/reg16), IMUL (mem/reg16), IDIV (mem/reg16), NOT (mem/reg16), NEG (mem/reg16)
+ * - Logical: TEST (mem/reg16,imm16)
+ * - Control Flow: JZ/JE, JNZ/JNE, JC, JNC, CALL (rel16), RET
+ * - System: NOP, HLT, CLC, STC, CMC
+ * 
+ * TODO: Missing instruction opcodes for the following planned instructions:
+ * - Data Transfer: MOV (additional variants)
+ * - Arithmetic: SUB, INC, DEC, CMP, ADD (additional variants)
+ * - Logical: AND, OR, XOR (main opcodes)
+ * - String Operations: MOVSB, LODSB, STOSB, CMPSB
+ * - Control Flow: JMP (unconditional)
+ * - Shifts/Rotates: ROL, ROR, SHL, SHR (opcodes - ALU methods exist)
+ */
 import { Registers, FLAGS } from './registers.js';
 import { Memory } from './memory.js';
 import { ALU } from './alu.js';
@@ -34,6 +52,93 @@ export class CPU {
         return (high << 8) | low;
     }
 
+    /**
+     * Addressing Mode Resolver
+     * Translates ModR/M bits into a 16-bit Memory Offset.
+     * Ref: Ticket [R1-B]
+     */
+    resolveEffectiveAddress(mod, rm) {
+        let ea = 0;
+        let defaultSegment = 'DS'; // Default for most modes
+
+        switch (rm) {
+            case 0: ea = this.registers.get16('BX') + this.registers.get16('SI'); break;
+            case 1: ea = this.registers.get16('BX') + this.registers.get16('DI'); break;
+            case 2: 
+                ea = this.registers.get16('BP') + this.registers.get16('SI'); 
+                defaultSegment = 'SS'; // BP Rule applied
+                break;
+            case 3: 
+                ea = this.registers.get16('BP') + this.registers.get16('DI'); 
+                defaultSegment = 'SS'; // BP Rule applied
+                break;
+            case 4: ea = this.registers.get16('SI'); break;
+            case 5: ea = this.registers.get16('DI'); break;
+            case 6: 
+                if (mod === 0) {
+                    ea = this.fetchWord(); 
+                } else {
+                    ea = this.registers.get16('BP'); 
+                    defaultSegment = 'SS'; // BP Rule applied
+                }
+                break;
+            case 7: ea = this.registers.get16('BX'); break;
+        }
+
+        if (mod === 1) {
+            ea += (this.fetchByte() << 24) >> 24; 
+        } else if (mod === 2) {
+            ea += this.fetchWord();
+        }
+
+        return { offset: ea & 0xFFFF, segment: defaultSegment };
+    }
+
+    /*
+    * Stack Operations (PUSH/POP)
+    * Ref: Ticket [R1-C]
+    */
+    push16(value) {
+        let sp = this.registers.get16('SP');
+        let ss = this.registers.get16('SS');
+        
+        // Decrement SP by 2 before writing (Stack grows downward)
+        sp = (sp - 2) & 0xFFFF;
+        this.registers.set16('SP', sp);
+        
+        // Write the 16-bit word (Little Endian)
+        this.memory.writeByte(ss, sp, value & 0xFF);
+        this.memory.writeByte(ss, sp + 1, (value >> 8) & 0xFF);
+    }
+
+    pop16() {
+        let sp = this.registers.get16('SP');
+        let ss = this.registers.get16('SS');
+        
+        // Read the 16-bit word (Little Endian)
+        const low = this.memory.readByte(ss, sp);
+        const high = this.memory.readByte(ss, sp + 1);
+        const value = (high << 8) | low;
+        
+        // Increment SP by 2 after reading
+        this.registers.set16('SP', (sp + 2) & 0xFFFF);
+        
+        return value;
+    }
+
+    /**
+    * Internal helper to write 16-bit results back to either Register or Memory
+    */
+    _writeBack16(mod, rm, regName, offset, segment, value) {
+        if (mod === 3) {
+            this.registers.set16(regName, value);
+        } else {
+            const segVal = this.registers.get16(segment);
+            this.memory.writeByte(segVal, offset, value & 0xFF);
+            this.memory.writeByte(segVal, offset + 1, (value >> 8) & 0xFF);
+        }
+    }
+
     execute(opcode) {
         switch (opcode) {
             case 0x90: break; // NOP
@@ -58,6 +163,57 @@ export class CPU {
             }
 
             // MUL/DIV (Grouped under opcode 0xF7)
+            case 0xF7: { // Group 3: TEST, NOT, NEG, MUL, IMUL, DIV, IDIV (16-bit)
+                const modRM = this.fetchByte();
+                const mod = (modRM >> 6) & 0x03;
+                const extension = (modRM >> 3) & 0x07;
+                const rm = modRM & 0x07;
+
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                let operand;
+                let offset, segment; // For memory operations
+
+                // 1. Fetch the operand (Register or Memory)
+                if (mod === 3) {
+                    operand = this.registers.get16(regNames[rm]);
+                } else {
+                    const ea = this.resolveEffectiveAddress(mod, rm);
+                    offset = ea.offset;
+                    segment = ea.segment;
+                    const segVal = this.registers.get16(segment);
+                    // Read 16-bit word from memory
+                    const low = this.memory.readByte(segVal, offset);
+                    const high = this.memory.readByte(segVal, offset + 1);
+                    operand = (high << 8) | low;
+                }
+
+                // 2. Decode the sub-instruction via extension
+                switch (extension) {
+                    case 0: // TEST mem/reg, imm16
+                        this.alu.test16(operand, this.fetchWord());
+                        break;
+                    case 2: // NOT mem/reg
+                        const notRes = this.alu.not16(operand);
+                        this._writeBack16(mod, rm, regNames[rm], offset, segment, notRes);
+                        break;
+                    case 3: // NEG mem/reg
+                        const negRes = this.alu.neg16(operand);
+                        this._writeBack16(mod, rm, regNames[rm], offset, segment, negRes);
+                        break;
+                    case 4: // MUL (Unsigned)
+                        this.alu.mul16(operand);
+                        break;
+                    case 5: // IMUL (Signed)
+                        this.alu.imul16(operand);
+                        break;
+                    case 6: // DIV (Unsigned)
+                        this.alu.div16(operand);
+                        break;
+                    case 7: // IDIV (Signed)
+                        this.alu.idiv16(operand);
+                        break;
+                    default:
+                        console.error(`Undefined extension ${extension} for 0xF7`);
             case 0xF7: {
                 const modRM = this.fetchByte();
                 const regIndex = modRM & 0x07; // Destination register bits
@@ -92,6 +248,165 @@ export class CPU {
                     const currentIP = this.registers.get16('IP');
                     const signedOffset = (offset << 24) >> 24;
                     this.registers.set16('IP', currentIP + signedOffset);
+                }
+                break;
+            }
+
+            // MOV reg16, mem16 (Opcode 0x8B)
+            case 0x8B: {
+                const modRM = this.fetchByte();
+                const mod = (modRM >> 6) & 0x03;
+                const reg = (modRM >> 3) & 0x07;
+                const rm = modRM & 0x07;
+
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                const destReg = regNames[reg];
+
+                if (mod === 3) {
+                    // Register-to-Register move
+                    this.registers.set16(destReg, this.registers.get16(regNames[rm]));
+                } else {
+                    // Memory-to-Register move
+                    const { offset, segment } = this.resolveEffectiveAddress(mod, rm);
+                    const segVal = this.registers.get16(segment);
+                    const value = (this.memory.readByte(segVal, offset + 1) << 8) | this.memory.readByte(segVal, offset);
+                    this.registers.set16(destReg, value);
+                }
+                break;
+            }
+
+            // PUSH reg16 (Opcodes 0x50 - 0x57)
+            case 0x50: case 0x51: case 0x52: case 0x53:
+            case 0x54: case 0x55: case 0x56: case 0x57: {
+                const regIndex = opcode - 0x50;
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                this.push16(this.registers.get16(regNames[regIndex]));
+                break;
+            }
+
+            // POP reg16 (Opcodes 0x58 - 0x5F)
+            case 0x58: case 0x59: case 0x5A: case 0x5B:
+            case 0x5C: case 0x5D: case 0x5E: case 0x5F: {
+                const regIndex = opcode - 0x58;
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                this.registers.set16(regNames[regIndex], this.pop16());
+                break;
+            }
+
+            case 0x8D: { // LEA reg16, mem16
+                const modRM = this.fetchByte();
+                const mod = (modRM >> 6) & 0x03;
+                const reg = (modRM >> 3) & 0x07;
+                const rm = modRM & 0x07;
+
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                const destReg = regNames[reg];
+
+                // LEA only works on memory, ignore mod 3 (register mode)
+                if (mod !== 3) {
+                    const { offset } = this.resolveEffectiveAddress(mod, rm);
+                    this.registers.set16(destReg, offset); // We store the OFFSET, not the memory value
+                }
+                break;
+            }
+
+            case 0xE8: { // CALL rel16 (Near Call)
+                const offset = this.fetchWord(); // Displacement
+                const currentIP = this.registers.get16('IP');
+                
+                // 1. Push return address (current IP) to stack
+                this.push16(currentIP);
+                
+                // 2. Jump to target: New IP = current IP + signed offset
+                const signedOffset = (offset << 16) >> 16; 
+                this.registers.set16('IP', (currentIP + signedOffset) & 0xFFFF);
+                break;
+            }
+
+            case 0xC3: { // RET (Near Return)
+                // 1. Pop the return address from the stack into IP
+                const returnAddress = this.pop16();
+                this.registers.set16('IP', returnAddress);
+                break;
+            }
+
+            case 0x72: { // JC (Jump if Carry)
+                const offset = this.fetchByte();
+                if (this.registers.getFlag(FLAGS.CF) === 1) {
+                    const signedOffset = (offset << 24) >> 24;
+                    this.registers.set16('IP', (this.registers.get16('IP') + signedOffset) & 0xFFFF);
+                }
+                break;
+            }
+
+            case 0x73: { // JNC (Jump if Not Carry)
+                const offset = this.fetchByte();
+                if (this.registers.getFlag(FLAGS.CF) === 0) {
+                    const signedOffset = (offset << 24) >> 24;
+                    this.registers.set16('IP', (this.registers.get16('IP') + signedOffset) & 0xFFFF);
+                }
+                break;
+            }
+
+            case 0xF8: // CLC (Clear Carry Flag)
+                this.registers.setFlag(FLAGS.CF, 0);
+                break;
+
+            case 0xF9: // STC (Set Carry Flag)
+                this.registers.setFlag(FLAGS.CF, 1);
+                break;
+
+            case 0xF5: // CMC (Complement Carry Flag)
+                const currentCF = this.registers.getFlag(FLAGS.CF);
+                this.registers.setFlag(FLAGS.CF, currentCF === 0 ? 1 : 0);
+                break;
+
+            // Fast XCHG: AX with reg16 (0x91 to 0x97)
+            // Note: 0x90 is XCHG AX, AX, which is technically NOP.
+            case 0x91: case 0x92: case 0x93: case 0x94: case 0x95: case 0x96: case 0x97: {
+                const regIndex = opcode - 0x90;
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                const regName = regNames[regIndex];
+                
+                const valAX = this.registers.get16('AX');
+                const valReg = this.registers.get16(regName);
+                
+                this.registers.set16('AX', valReg);
+                this.registers.set16(regName, valAX);
+                break;
+            }
+
+            // General XCHG: reg16 with mem/reg16
+            case 0x87: {
+                const modRM = this.fetchByte();
+                const mod = (modRM >> 6) & 0x03;
+                const reg = (modRM >> 3) & 0x07;
+                const rm = modRM & 0x07;
+                const regNames = ['AX', 'CX', 'DX', 'BX', 'SP', 'BP', 'SI', 'DI'];
+                
+                const valReg = this.registers.get16(regNames[reg]);
+
+                if (mod === 3) {
+                    // Register-to-Register swap
+                    const valRM = this.registers.get16(regNames[rm]);
+                    this.registers.set16(regNames[reg], valRM);
+                    this.registers.set16(regNames[rm], valReg);
+                } else {
+                    // Register-to-Memory swap
+                    const { offset, segment } = this.resolveEffectiveAddress(mod, rm);
+                    const ss = this.registers.get16(segment);
+                    
+                    // Read from memory
+                    const low = this.memory.readByte(ss, offset);
+                    const high = this.memory.readByte(ss, offset + 1);
+                    const valMem = (high << 8) | low;
+                    
+                    // Write register value to memory
+                    this.memory.writeByte(ss, offset, valReg & 0xFF);
+                    this.memory.writeByte(ss, offset + 1, (valReg >> 8) & 0xFF);
+                    
+                    // Write memory value to register
+                    this.registers.set16(regNames[reg], valMem);
                 }
                 break;
             }
